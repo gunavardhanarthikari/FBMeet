@@ -15,7 +15,7 @@ export function InputField({ label, className = '', id, ...props }: InputFieldPr
       </label>
       <input
         id={id}
-        className={`rounded-sm border border-border-emphasis bg-surface-sunken px-3.5 py-[11px] font-body text-base text-text-body shadow-inset-sm outline-none focus:border-accent ${className}`}
+        className={`rounded-sm border border-border-emphasis bg-surface-sunken px-3.5 py-[11px] font-body text-base text-text-body shadow-inset-sm outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent ${className}`}
         {...props}
       />
     </div>

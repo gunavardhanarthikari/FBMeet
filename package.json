@@ -8,9 +8,14 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck:api": "tsc --noEmit -p tsconfig.api.json",
+    "verify:token": "node scripts/verify-token.mjs"
   },
   "dependencies": {
+    "@livekit/components-react": "^2.9.23",
+    "livekit-client": "^2.20.1",
+    "livekit-server-sdk": "^2.17.0",
     "nanoid": "^6.0.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -22,6 +27,7 @@
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vercel/node": "^5.8.26",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.4",
     "eslint": "^10.7.0",

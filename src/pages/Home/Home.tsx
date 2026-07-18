@@ -9,7 +9,6 @@ export function Home() {
 
   function handleNewMeeting() {
     const roomId = generateRoomId()
-    console.log('new meeting', roomId)
     navigate(`/room/${roomId}`, { state: { justCreated: true } })
   }
 

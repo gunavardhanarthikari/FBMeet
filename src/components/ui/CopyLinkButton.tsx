@@ -40,7 +40,8 @@ export function CopyLinkButton({ text, autoTrigger = false, className = '' }: Co
       <button
         type="button"
         onClick={attemptCopy}
-        className={`rounded-sm border border-border-emphasis bg-transparent px-2.5 py-1 font-mono text-[10px] tracking-[0.04em] uppercase transition-colors duration-300 ease-out-soft ${
+        aria-label={status === 'copied' ? 'Link copied to clipboard' : 'Copy meeting link'}
+        className={`rounded-sm border border-border-emphasis bg-transparent px-2.5 py-1 font-mono text-[10px] tracking-[0.04em] uppercase transition-colors duration-300 ease-out-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${
           status === 'copied' ? 'text-text-title' : 'text-text-muted'
         } ${className}`}
       >

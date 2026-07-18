@@ -5,12 +5,10 @@ export function ShareConfirm() {
   const navigate = useNavigate()
 
   function handleConfirm() {
-    console.log('start sharing')
     navigate('/room/demo-room')
   }
 
   function handleCancel() {
-    console.log('cancel share')
     navigate('/room/demo-room')
   }
 

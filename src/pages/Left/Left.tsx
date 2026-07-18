@@ -10,11 +10,9 @@ export function Left() {
     <div className="animate-mood-fade flex min-h-screen items-center justify-center p-8 md:p-16">
       <LeaveCard
         onRejoin={() => {
-          console.log('rejoin', roomId)
           navigate(roomId ? `/room/${roomId}` : '/')
         }}
         onReturnHome={() => {
-          console.log('return home')
           navigate('/')
         }}
       />

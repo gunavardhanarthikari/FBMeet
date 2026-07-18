@@ -11,4 +11,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    // Local dev: run `vercel dev` (defaults to :3000) alongside `npm run dev`
+    // so /api/token resolves without a CORS dance.
+    proxy: {
+      '/api': 'http://localhost:3000',
+    },
+  },
 })

@@ -15,6 +15,12 @@ export interface UseLocalMediaResult {
   toggleCamera: () => void
   toggleMic: () => void
   retry: () => void
+  release: () => void
+  screenStream: MediaStream | null
+  isSharing: boolean
+  screenShareSupported: boolean
+  startScreenShare: () => Promise<boolean>
+  stopScreenShare: () => void
 }
 
 function isMediaSupported() {
@@ -22,6 +28,14 @@ function isMediaSupported() {
     typeof navigator !== 'undefined' &&
     typeof navigator.mediaDevices !== 'undefined' &&
     typeof navigator.mediaDevices.getUserMedia === 'function'
+  )
+}
+
+function isScreenShareSupported() {
+  return (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.mediaDevices !== 'undefined' &&
+    typeof navigator.mediaDevices.getDisplayMedia === 'function'
   )
 }
 
@@ -35,11 +49,16 @@ export function useLocalMedia(): UseLocalMediaResult {
   const [cameraDenied, setCameraDenied] = useState(false)
   const [micDenied, setMicDenied] = useState(false)
 
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null)
+
   const streamRef = useRef<MediaStream | null>(null)
-  // Separate tokens per track kind: video and audio are acquired independently,
-  // so one in-flight request must never be able to invalidate the other's.
+  const screenStreamRef = useRef<MediaStream | null>(null)
+  // Separate tokens per track kind: video and audio (and screen share) are
+  // acquired independently, so one in-flight request must never be able to
+  // invalidate another's.
   const videoTokenRef = useRef(0)
   const audioTokenRef = useRef(0)
+  const screenTokenRef = useRef(0)
   const mountedRef = useRef(true)
 
   const finalizeStatus = useCallback(() => {
@@ -120,6 +139,39 @@ export function useLocalMedia(): UseLocalMediaResult {
     }
   }, [bindEndedHandler, finalizeStatus])
 
+  const stopScreenShare = useCallback(() => {
+    screenTokenRef.current += 1 // invalidate any in-flight getDisplayMedia() prompt
+    screenStreamRef.current?.getTracks().forEach((track) => track.stop())
+    screenStreamRef.current = null
+    setScreenStream(null)
+  }, [])
+
+  const startScreenShare = useCallback(async () => {
+    if (!isScreenShareSupported()) return false
+    const token = ++screenTokenRef.current
+    try {
+      const captured = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+      if (token !== screenTokenRef.current || !mountedRef.current) {
+        captured.getTracks().forEach((track) => track.stop())
+        return false
+      }
+      // If the user stops sharing via the browser's own "Stop sharing" bar
+      // instead of our control, the video track ends on its own — treat that
+      // exactly like pressing our stop button.
+      captured.getVideoTracks()[0]?.addEventListener('ended', () => {
+        if (!mountedRef.current || token !== screenTokenRef.current) return
+        stopScreenShare()
+      })
+      screenStreamRef.current = captured
+      setScreenStream(captured)
+      return true
+    } catch {
+      // User cancelled the picker, or the browser denied it — not an error
+      // worth surfacing, screen share simply doesn't start.
+      return false
+    }
+  }, [stopScreenShare])
+
   // Cleanup: stop every track on unmount (leaving the Lobby, navigating away, refresh-in-SPA).
   useEffect(() => {
     mountedRef.current = true
@@ -127,6 +179,8 @@ export function useLocalMedia(): UseLocalMediaResult {
       mountedRef.current = false
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
+      screenStreamRef.current?.getTracks().forEach((track) => track.stop())
+      screenStreamRef.current = null
     }
   }, [])
 
@@ -184,9 +238,30 @@ export function useLocalMedia(): UseLocalMediaResult {
     if (!streamRef.current?.getAudioTracks().length) void acquireAudio()
   }, [acquireVideo, acquireAudio])
 
+  // Explicit, immediate stop — used when leaving a call, rather than waiting
+  // for this hook's owner to unmount. Bumping both tokens invalidates any
+  // acquisition still in flight so it can't resurrect a track afterwards.
+  const release = useCallback(() => {
+    videoTokenRef.current += 1
+    audioTokenRef.current += 1
+    screenTokenRef.current += 1
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    screenStreamRef.current?.getTracks().forEach((track) => track.stop())
+    screenStreamRef.current = null
+    setStream(null)
+    setScreenStream(null)
+    setCameraOn(false)
+    setMicOn(false)
+    setStatus(isMediaSupported() ? 'idle' : 'unsupported')
+  }, [])
+
   const message = useMemo(() => {
     if (status === 'unsupported') {
       return 'Camera and microphone preview aren’t supported in this browser.'
+    }
+    if (status === 'requesting') {
+      return 'Requesting camera and microphone access…'
     }
     if (cameraDenied && micDenied) {
       return 'Camera and microphone access were denied — you can still join without them.'
@@ -213,5 +288,11 @@ export function useLocalMedia(): UseLocalMediaResult {
     toggleCamera,
     toggleMic,
     retry,
+    release,
+    screenStream,
+    isSharing: !!screenStream,
+    screenShareSupported: isScreenShareSupported(),
+    startScreenShare,
+    stopScreenShare,
   }
 }

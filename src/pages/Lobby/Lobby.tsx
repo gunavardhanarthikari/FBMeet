@@ -4,8 +4,8 @@ import { PreviewCard } from '@/components/lobby/PreviewCard'
 import { InputField } from '@/components/ui/InputField'
 import { PrimaryButton } from '@/components/ui/PrimaryButton'
 import { CopyLinkButton } from '@/components/ui/CopyLinkButton'
-import { useMeeting } from '@/contexts'
-import { useLocalMedia } from '@/hooks/useLocalMedia'
+import { useMeeting, useLiveKit } from '@/contexts'
+import type { UseLocalMediaResult } from '@/hooks/useLocalMedia'
 import { buildRoomUrl } from '@/lib/roomUrl'
 
 const MAX_NAME_LENGTH = 40
@@ -13,15 +13,18 @@ const MAX_NAME_LENGTH = 40
 interface LobbyProps {
   roomId: string
   isHost: boolean
+  media: UseLocalMediaResult
 }
 
-export function Lobby({ roomId, isHost }: LobbyProps) {
+export function Lobby({ roomId, isHost, media }: LobbyProps) {
   const { displayName, setDisplayName, setJoined } = useMeeting()
+  const liveKit = useLiveKit()
   const [name, setName] = useState(displayName)
   const [error, setError] = useState('')
-  const media = useLocalMedia()
 
-  function handleJoin() {
+  const connecting = liveKit.connectionState === 'connecting'
+
+  async function handleJoin() {
     const trimmed = name.trim()
 
     if (!trimmed) {
@@ -35,9 +38,14 @@ export function Lobby({ roomId, isHost }: LobbyProps) {
     }
 
     setError('')
-    media.requestMedia()
-    console.log('join now', { roomId, name: trimmed })
     setDisplayName(trimmed)
+
+    const connected = await liveKit.connect(roomId, trimmed, media.stream)
+    if (!connected) {
+      setError(liveKit.error ?? 'Could not join the room. Please try again.')
+      return
+    }
+
     setJoined(true)
   }
 
@@ -100,7 +108,9 @@ export function Lobby({ roomId, isHost }: LobbyProps) {
           {error && <p className="font-mono text-xs text-leave-border">{error}</p>}
         </div>
 
-        <PrimaryButton onClick={handleJoin}>Join now</PrimaryButton>
+        <PrimaryButton onClick={handleJoin} disabled={connecting}>
+          {connecting ? 'Joining…' : 'Join now'}
+        </PrimaryButton>
 
         <Link
           to="/"

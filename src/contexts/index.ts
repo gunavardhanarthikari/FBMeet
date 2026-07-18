@@ -1,2 +1,5 @@
 export { MeetingProvider } from './MeetingProvider'
 export { useMeeting } from './MeetingContext'
+export { LiveKitProvider } from './LiveKitProvider'
+export { useLiveKit } from './LiveKitContext'
+export type { LiveKitConnectionState } from './LiveKitContext'

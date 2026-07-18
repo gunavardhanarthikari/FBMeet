@@ -1,7 +1,8 @@
+import { memo, useEffect, useRef } from 'react'
 import type { Participant } from '@/types'
 import { AvatarPlaceholder } from '@/components/ui/AvatarPlaceholder'
 import { GradientBackground } from '@/components/ui/GradientBackground'
-import { MicOffIcon, MicIcon, XIcon } from '@/components/ui/icons'
+import { MicOffIcon, MicIcon, ScreenShareIcon, XIcon } from '@/components/ui/icons'
 
 interface ParticipantTileProps {
   participant: Participant
@@ -10,22 +11,52 @@ interface ParticipantTileProps {
   onRemove?: (id: string) => void
 }
 
-export function ParticipantTile({
+function ParticipantTileComponent({
   participant,
   isHostView = false,
   onToggleMute,
   onRemove,
 }: ParticipantTileProps) {
-  const { name, isSelf, micMuted, cameraOff, seedColor } = participant
+  const {
+    name,
+    isSelf,
+    micMuted,
+    cameraOff,
+    seedColor,
+    videoStream,
+    isPresenting,
+    connectionQuality,
+  } = participant
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const hasVideo = !cameraOff && !!videoStream
+  const connectionIssue =
+    connectionQuality === 'poor' || connectionQuality === 'lost' ? connectionQuality : null
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !videoStream) return
+    if (video.srcObject !== videoStream) {
+      video.srcObject = videoStream
+    }
+    video.play().catch(() => {})
+  }, [videoStream, hasVideo])
 
   return (
-    <div className="relative aspect-video min-w-0 overflow-hidden rounded-md border border-border-default bg-surface-sunken shadow-sm">
-      {cameraOff ? (
-        <GradientBackground seedColor={seedColor}>
-          <AvatarPlaceholder name={name} size={64} />
-        </GradientBackground>
+    <div
+      className={`relative aspect-video min-w-0 overflow-hidden rounded-md border bg-surface-sunken shadow-sm ${
+        isPresenting ? 'border-accent' : 'border-border-default'
+      }`}
+    >
+      {hasVideo ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isSelf}
+          className={`h-full w-full object-cover ${isSelf ? 'scale-x-[-1]' : ''}`}
+        />
       ) : (
-        <GradientBackground seedColor={seedColor} className="opacity-90">
+        <GradientBackground seedColor={seedColor} className={cameraOff ? '' : 'opacity-90'}>
           <AvatarPlaceholder name={name} size={64} />
         </GradientBackground>
       )}
@@ -36,10 +67,19 @@ export function ParticipantTile({
         ) : (
           <MicIcon className="h-3.5 w-3.5 shrink-0" />
         )}
+        {isPresenting && <ScreenShareIcon className="h-3.5 w-3.5 shrink-0 text-accent" />}
         <span className="truncate">
           {name}
           {isSelf ? ' (you)' : ''}
         </span>
+        {connectionIssue && (
+          <span
+            role="img"
+            aria-label={connectionIssue === 'lost' ? 'Connection lost' : 'Poor connection'}
+            title={connectionIssue === 'lost' ? 'Connection lost' : 'Poor connection'}
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-leave-border"
+          />
+        )}
       </div>
 
       {isHostView && !isSelf && (
@@ -47,8 +87,9 @@ export function ParticipantTile({
           <button
             type="button"
             onClick={() => onToggleMute?.(participant.id)}
-            aria-label="Toggle participant mute"
-            className={`flex h-7 w-7 items-center justify-center rounded-md border border-border-emphasis text-text-body ${
+            aria-label={micMuted ? `Unmute ${name}` : `Mute ${name}`}
+            aria-pressed={micMuted}
+            className={`flex h-7 w-7 items-center justify-center rounded-md border border-border-emphasis text-text-body focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
               micMuted ? 'bg-accent text-text-onaccent' : 'bg-white/92'
             }`}
           >
@@ -57,8 +98,8 @@ export function ParticipantTile({
           <button
             type="button"
             onClick={() => onRemove?.(participant.id)}
-            aria-label="Remove participant"
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-border-emphasis bg-white/92 text-text-body"
+            aria-label={`Remove ${name}`}
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-border-emphasis bg-white/92 text-text-body focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
           >
             <XIcon className="h-3.5 w-3.5" />
           </button>
@@ -67,3 +108,5 @@ export function ParticipantTile({
     </div>
   )
 }
+
+export const ParticipantTile = memo(ParticipantTileComponent)
