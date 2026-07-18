@@ -1,0 +1,121 @@
+@import 'tailwindcss';
+
+/*
+  FBMeet theme — light teal / literary-notebook palette,
+  reverse-engineered visually from FBMeet.html (design reference only).
+*/
+@theme {
+  /* ---- colors ---- */
+  --color-bg-page: #f5f7f7;
+  --color-surface-card: #ffffff;
+  --color-surface-sunken: #eceff0;
+  --color-border-default: #e4e8e8;
+  --color-border-emphasis: #d3d9d9;
+  --color-border-accent: #bfe4df;
+
+  --color-accent: #1fb9ad;
+  --color-accent-muted: #1c7d74;
+
+  --color-text-title: #0e6b63;
+  --color-text-body: #20302e;
+  --color-text-soft: #48544f;
+  --color-text-muted: #6a7470;
+  --color-text-faint: #9aa39f;
+  --color-text-onaccent: #ffffff;
+
+  --color-leave-bg: #5a1414;
+  --color-leave-border: #7a1e1e;
+  --color-leave-icon: #e8cfc0;
+
+  --color-scrim: rgba(20, 35, 33, 0.5);
+  --color-wash-accent: rgba(31, 185, 173, 0.1);
+  --color-wash-accent-strong: rgba(31, 185, 173, 0.16);
+
+  /* ---- fonts ---- */
+  --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
+  --font-body: 'EB Garamond', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ---- type scale ---- */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 17px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 44px;
+  --text-4xl: 64px;
+  --text-5xl: clamp(48px, 8vw, 88px);
+
+  --tracking-label: 0.22em;
+
+  /* ---- radii ---- */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 5px;
+
+  /* ---- shadows ---- */
+  --shadow-sm: 0 1px 3px rgba(20, 40, 38, 0.1);
+  --shadow-md: 0 8px 24px -8px rgba(20, 40, 38, 0.18);
+  --shadow-lg: 0 24px 60px -20px rgba(20, 40, 38, 0.22);
+  --shadow-inset-sm: inset 0 1px 2px rgba(20, 40, 38, 0.08);
+  --shadow-glow-accent: 0 0 24px -4px rgba(31, 185, 173, 0.35);
+  --shadow-share-frame:
+    0 0 0 1px #bfe4df, 0 12px 40px -16px rgba(31, 185, 173, 0.28);
+
+  /* ---- motion ---- */
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-mood-fade: mood-fade 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-mood-fade-fast: mood-fade 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-mood-pulse: mood-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mood-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mood-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-page);
+  color: var(--color-text-body);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--color-text-title);
+}
