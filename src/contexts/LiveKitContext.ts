@@ -25,6 +25,13 @@ export interface LiveKitContextValue {
    *  audio — call `unlockAudio()` from a user gesture to resume playback. */
   canPlaybackAudio: boolean
   unlockAudio: () => void
+  /**
+   * Dev-only diagnostics for the last failed `connect()` attempt, formatted
+   * as `"<ErrorName>: <message>"`. Always returns `null` in production
+   * builds (`import.meta.env.DEV` is `false` there) — callers should fall
+   * back to `error`/a generic message when this returns `null`.
+   */
+  getDevJoinErrorDetail: () => string | null
   connect: (roomId: string, participantName: string, localStream: MediaStream | null) => Promise<boolean>
   disconnect: () => void
 }

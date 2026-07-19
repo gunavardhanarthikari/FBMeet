@@ -67,9 +67,13 @@ function ControlBarComponent({
             ? sharing
               ? 'Stop presenting'
               : 'Present now'
-            : 'Screen sharing is not supported in this browser'
+            : "Screen sharing isn't supported by this browser. Join from a desktop browser to share your screen."
         }
-        title={shareSupported ? undefined : 'Screen sharing is not supported in this browser'}
+        title={
+          shareSupported
+            ? undefined
+            : "Screen sharing isn't supported by this browser. Join from a desktop browser to share your screen."
+        }
         aria-pressed={sharing}
       />
       <IconButton

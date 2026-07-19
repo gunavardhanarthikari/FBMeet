@@ -54,7 +54,13 @@ export function Lobby({ roomId, isHost, media }: LobbyProps) {
       const stream = await media.requestMedia()
       const connected = await liveKit.connect(roomId, trimmed, stream)
       if (!connected) {
-        setError(liveKit.error ?? 'Could not join the room. Please try again.')
+        // getDevJoinErrorDetail() reads from a ref inside LiveKitProvider, so
+        // — unlike `liveKit.error` here, which is fixed to whatever this
+        // closure's context snapshot was before the click — it always
+        // reflects the failure that JUST happened. It only ever returns
+        // non-null in a dev build; production keeps the generic message.
+        const devDetail = liveKit.getDevJoinErrorDetail()
+        setError(devDetail ?? liveKit.error ?? 'Could not join the room. Please try again.')
         return
       }
       setJoined(true)

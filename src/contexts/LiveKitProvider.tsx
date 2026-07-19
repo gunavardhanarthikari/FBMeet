@@ -93,6 +93,10 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
   const attemptIdRef = useRef(0)
   const busyRef = useRef(false)
   const reconnectedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Dev-only diagnostics: a ref (not state) so reading it right after
+  // `await connect()` always gets the value written during that same call,
+  // never a stale one captured by an earlier render's closure.
+  const lastJoinErrorRef = useRef<{ name: string; message: string } | null>(null)
 
   const syncParticipants = useCallback(() => {
     const currentRoom = roomRef.current
@@ -273,6 +277,16 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
         return true
       } catch (err) {
         if (isStale()) return false
+        if (import.meta.env.DEV) {
+          // Dev-only: capture the real exception for getDevJoinErrorDetail()
+          // and log it in full — never runs in a production build, and
+          // never feeds into the production-facing `error` message below.
+          lastJoinErrorRef.current =
+            err instanceof Error
+              ? { name: err.name, message: err.message }
+              : { name: 'UnknownError', message: String(err) }
+          console.error('[LiveKit] connect() failed:', err)
+        }
         setError(mapConnectionError(err))
         setConnectionState('failed')
         return false
@@ -282,6 +296,12 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
     },
     [syncParticipants, teardownRoom],
   )
+
+  const getDevJoinErrorDetail = useCallback(() => {
+    if (!import.meta.env.DEV) return null
+    const detail = lastJoinErrorRef.current
+    return detail ? `${detail.name}: ${detail.message}` : null
+  }, [])
 
   // Must be invoked from a direct user gesture (click/tap) — that's what
   // lets the browser's autoplay policy allow audio playback to resume.
@@ -336,6 +356,7 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
       error,
       canPlaybackAudio,
       unlockAudio,
+      getDevJoinErrorDetail,
       connect,
       disconnect,
     }),
@@ -349,6 +370,7 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
       error,
       canPlaybackAudio,
       unlockAudio,
+      getDevJoinErrorDetail,
       connect,
       disconnect,
     ],
