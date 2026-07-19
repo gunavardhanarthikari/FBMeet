@@ -153,9 +153,25 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
 
       const isStale = () => attemptId !== attemptIdRef.current
 
+      // Dev-only join-flow trace (Module 9.5): narrates each step to the
+      // console and — via `currentStep`/`diagnosticRoom` below — lets the
+      // catch block attribute a failure to an exact step with LiveKit
+      // context. Purely additive: every `if (import.meta.env.DEV)` branch is
+      // dead-code-eliminated from production bundles, so this changes
+      // nothing about production behavior, timing, or control flow.
+      let currentStep = 'requesting_token'
+      let diagnosticRoom: Room | null = null
+
       try {
+        if (import.meta.env.DEV) console.log('[Join] 5. Requesting token…')
         const token = await requestToken(roomId, participantName)
         if (isStale()) return false
+        if (import.meta.env.DEV) {
+          console.log('[Join] 6. Token received', {
+            room: roomId,
+            participantIdentity: participantName,
+          })
+        }
 
         const livekitUrl = import.meta.env.VITE_LIVEKIT_URL
         if (!livekitUrl) {
@@ -163,6 +179,7 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
         }
 
         const nextRoom = new Room({ adaptiveStream: true, dynacast: true })
+        diagnosticRoom = nextRoom
 
         nextRoom.on(RoomEvent.ParticipantConnected, syncParticipants)
         nextRoom.on(RoomEvent.ParticipantDisconnected, syncParticipants)
@@ -242,7 +259,10 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
           setActiveRemoteSpeakerId(loudestRemote?.identity ?? null)
         })
 
+        currentStep = 'room_connect'
+        if (import.meta.env.DEV) console.log('[Join] 7. Calling room.connect()…')
         await nextRoom.connect(livekitUrl, token)
+        if (import.meta.env.DEV) console.log('[Join] 8. room.connect() succeeded')
 
         if (isStale()) {
           teardownRoom(nextRoom)
@@ -256,18 +276,30 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
 
         if (localStream) {
           const tracks = [...localStream.getVideoTracks(), ...localStream.getAudioTracks()]
+          currentStep = 'publish_tracks'
           await Promise.all(
-            tracks.map((track) =>
-              nextRoom.localParticipant
+            tracks.map((track) => {
+              if (import.meta.env.DEV) {
+                console.log(
+                  track.kind === 'video' ? '[Join] 10. Publishing camera…' : '[Join] 9. Publishing microphone…',
+                )
+              }
+              return nextRoom.localParticipant
                 .publishTrack(track, {
                   source: track.kind === 'video' ? Track.Source.Camera : Track.Source.Microphone,
                 })
-                .catch(() => {
+                .catch((err) => {
                   // Publishing one track failing shouldn't fail the whole join —
-                  // the participant simply appears without that track.
-                }),
-            ),
+                  // the participant simply appears without that track. Still
+                  // worth seeing in dev, since this is exactly the kind of
+                  // per-track failure that's otherwise invisible.
+                  if (import.meta.env.DEV) {
+                    console.error(`[Join] Publishing ${track.kind} track failed:`, err)
+                  }
+                })
+            }),
           )
+          if (import.meta.env.DEV) console.log('[Join] 11. Publish completed')
         }
 
         if (isStale()) return false
@@ -278,14 +310,27 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         if (isStale()) return false
         if (import.meta.env.DEV) {
-          // Dev-only: capture the real exception for getDevJoinErrorDetail()
-          // and log it in full — never runs in a production build, and
-          // never feeds into the production-facing `error` message below.
-          lastJoinErrorRef.current =
-            err instanceof Error
-              ? { name: err.name, message: err.message }
-              : { name: 'UnknownError', message: String(err) }
-          console.error('[LiveKit] connect() failed:', err)
+          // Dev-only: capture the real exception for getDevJoinErrorDetail(),
+          // and log it in full with exactly which step it happened on. None
+          // of this runs in a production build, and none of it feeds into
+          // the production-facing `error` message set below.
+          const name = err instanceof Error ? err.name : typeof err
+          const message = err instanceof Error ? err.message : String(err)
+          lastJoinErrorRef.current = { name, message }
+          console.error(`[Join] Step failed: ${currentStep}`, err)
+          console.error('[Join] Exception object:', err)
+          console.error('[Join] Exception name:', name)
+          console.error('[Join] Exception message:', message)
+          if (err instanceof ConnectionError) {
+            console.error('[Join] LiveKit context:', {
+              // This attempt has been 'connecting' since the top of this
+              // function and is about to become 'failed' a few lines below —
+              // there's no intermediate state to read for this attempt.
+              connectionState: 'connecting',
+              roomState: diagnosticRoom?.state ?? 'room not created',
+              participantIdentity: diagnosticRoom?.localParticipant?.identity || participantName,
+            })
+          }
         }
         setError(mapConnectionError(err))
         setConnectionState('failed')

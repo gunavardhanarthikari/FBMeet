@@ -50,8 +50,33 @@ export function Lobby({ roomId, isHost, media }: LobbyProps) {
     setDisplayName(trimmed)
     setJoining(true)
 
+    // Dev-only join-flow trace (Module 9.5): narrates each step to the
+    // console, and `currentStep` lets the catch block below attribute an
+    // unexpected throw to exactly where it happened. Steps 5–11 (token
+    // request, room.connect(), publishing) are traced inside
+    // LiveKitProvider.connect() itself, where those operations actually
+    // happen. Every branch here is gated on `import.meta.env.DEV`, which is
+    // a compile-time `false` in production builds and dead-code-eliminated,
+    // so none of this exists in what ships.
+    let currentStep = 'join_button_clicked'
+    if (import.meta.env.DEV) console.log('[Join] 1. Join button clicked', { roomId, name: trimmed })
+
     try {
+      currentStep = 'requestMedia_started'
+      if (import.meta.env.DEV) console.log('[Join] 2. requestMedia() started')
+
       const stream = await media.requestMedia()
+
+      currentStep = 'requestMedia_completed'
+      if (import.meta.env.DEV) {
+        console.log('[Join] 3. requestMedia() completed')
+        console.log('[Join] 4. MediaStream acquired', {
+          audioTracks: stream?.getAudioTracks().length ?? 0,
+          videoTracks: stream?.getVideoTracks().length ?? 0,
+        })
+      }
+
+      currentStep = 'liveKit_connect'
       const connected = await liveKit.connect(roomId, trimmed, stream)
       if (!connected) {
         // getDevJoinErrorDetail() reads from a ref inside LiveKitProvider, so
@@ -63,7 +88,25 @@ export function Lobby({ roomId, isHost, media }: LobbyProps) {
         setError(devDetail ?? liveKit.error ?? 'Could not join the room. Please try again.')
         return
       }
+
+      if (import.meta.env.DEV) console.log('[Join] 12. Join completed successfully')
       setJoined(true)
+    } catch (err) {
+      // connect() already catches its own errors internally and returns
+      // `false` rather than throwing — so reaching here means something
+      // outside that (e.g. requestMedia()) threw unexpectedly. Logged, then
+      // rethrown unchanged so production behavior (propagate to the nearest
+      // error boundary) is identical whether or not this catch exists.
+      if (import.meta.env.DEV) {
+        console.error(`[Join] Step failed: ${currentStep}`, err)
+        console.error('[Join] Exception object:', err)
+        console.error('[Join] Exception name:', err instanceof Error ? err.name : typeof err)
+        console.error(
+          '[Join] Exception message:',
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+      throw err
     } finally {
       setJoining(false)
     }
