@@ -21,9 +21,18 @@ export function Lobby({ roomId, isHost, media }: LobbyProps) {
   const liveKit = useLiveKit()
   const [name, setName] = useState(displayName)
   const [error, setError] = useState('')
+  const [joining, setJoining] = useState(false)
 
-  const connecting = liveKit.connectionState === 'connecting'
+  const connecting = joining || liveKit.connectionState === 'connecting'
 
+  // Media acquisition happens only from this explicit user gesture — never
+  // from a mount effect — so the browser's permission prompt is always tied
+  // to the user clicking "Join now", never surprises them on page load.
+  // `requestMedia()` resolves with the freshly-acquired stream itself
+  // (rather than us reading `media.stream` afterwards), because this
+  // function's own `media` closure is fixed at render time: awaiting
+  // doesn't refresh it, so re-reading `media.stream` post-await could still
+  // see the pre-acquisition (empty) value.
   async function handleJoin() {
     const trimmed = name.trim()
 
@@ -39,14 +48,19 @@ export function Lobby({ roomId, isHost, media }: LobbyProps) {
 
     setError('')
     setDisplayName(trimmed)
+    setJoining(true)
 
-    const connected = await liveKit.connect(roomId, trimmed, media.stream)
-    if (!connected) {
-      setError(liveKit.error ?? 'Could not join the room. Please try again.')
-      return
+    try {
+      const stream = await media.requestMedia()
+      const connected = await liveKit.connect(roomId, trimmed, stream)
+      if (!connected) {
+        setError(liveKit.error ?? 'Could not join the room. Please try again.')
+        return
+      }
+      setJoined(true)
+    } finally {
+      setJoining(false)
     }
-
-    setJoined(true)
   }
 
   return (

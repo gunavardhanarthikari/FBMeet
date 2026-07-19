@@ -50,6 +50,39 @@ function RemoteFilmstrip({
   )
 }
 
+// During screen sharing, participants move into a permanent vertical strip
+// on the right of the shared screen — self pinned at the top, remotes
+// listed below, independently scrollable — instead of being hidden or
+// squeezed into a horizontal strip. Reuses ParticipantTile as-is (its
+// default 'grid' variant already renders live video, mute/camera badges,
+// speaking highlight, and connection indicator), just in a different
+// container shape.
+function PresenterSidebar({
+  selfParticipant,
+  remoteParticipants,
+  isHost,
+  activeSpeakerId,
+}: {
+  selfParticipant: Participant
+  remoteParticipants: Participant[]
+  isHost: boolean
+  activeSpeakerId: string | null
+}) {
+  return (
+    <div className="flex min-h-0 w-28 shrink-0 flex-col gap-3 overflow-y-auto sm:w-36 md:w-44">
+      <ParticipantTile participant={selfParticipant} />
+      {remoteParticipants.map((p) => (
+        <ParticipantTile
+          key={p.id}
+          participant={p}
+          isHostView={isHost}
+          isSpeaking={p.id === activeSpeakerId}
+        />
+      ))}
+    </div>
+  )
+}
+
 // How long a new active speaker has to stay loudest before the spotlight
 // actually switches to them. Without this, the spotlighted tile would swap
 // (and its video element remount) on every brief pause/interjection, which
@@ -93,16 +126,30 @@ export function Call({ roomId, isHost, media }: CallProps) {
     }
   }, [media.cameraOn, media.stream, liveKit.localParticipant, liveKit.connectionState])
 
-  // Mic muting itself already works at the media level (a disabled track
-  // transmits silence), but remote peers only see the "muted" badge update
-  // if LiveKit's own mute signaling fires — so mirror the intent through the
-  // publication too. useLocalMedia still owns the hardware track; this just
-  // tells the room what it already decided.
+  // Keep the published microphone track in sync with local state. Mirrors
+  // the camera effect above: publish the track if it exists but isn't
+  // published yet (self-healing — the initial connect()-time publish can
+  // miss it if acquisition was still in flight, e.g. a slow permission
+  // prompt, or a retry() after an earlier denial), otherwise mirror the mute
+  // intent through the publication. Muting itself already works at the media
+  // level (a disabled track transmits silence), but remote peers only see
+  // the "muted" badge update if LiveKit's own mute signaling fires — so this
+  // mirrors that intent through the publication too. useLocalMedia still
+  // owns the hardware track; this just tells the room what it already
+  // decided.
   useEffect(() => {
     const localParticipant = liveKit.localParticipant
     if (!localParticipant || liveKit.connectionState !== 'connected') return
 
     const publication = localParticipant.getTrackPublication(Track.Source.Microphone)
+    const audioTrack = media.stream?.getAudioTracks()[0]
+
+    if (audioTrack && !publication) {
+      void localParticipant
+        .publishTrack(audioTrack, { source: Track.Source.Microphone })
+        .catch(() => {})
+      return
+    }
     if (!publication) return
 
     if (media.micOn && publication.isMuted) {
@@ -110,7 +157,7 @@ export function Call({ roomId, isHost, media }: CallProps) {
     } else if (!media.micOn && !publication.isMuted) {
       void publication.mute()
     }
-  }, [media.micOn, liveKit.localParticipant, liveKit.connectionState])
+  }, [media.micOn, media.stream, liveKit.localParticipant, liveKit.connectionState])
 
   // Publish/unpublish the screen-share track as the user starts/stops
   // presenting, and react to the browser's own "Stop sharing" bar the same
@@ -217,14 +264,13 @@ export function Call({ roomId, isHost, media }: CallProps) {
     '--cols-lg': maxColumns,
   } as CSSProperties
 
-  // The floating self tile defaults to the bottom-right corner (the
+  // The floating self tile only applies outside presenter mode (presenter
+  // mode pins self at the top of the permanent sidebar instead — see
+  // PresenterSidebar). It defaults to the bottom-right corner (the
   // conventional PiP spot), except when a filmstrip of other tiles already
-  // occupies that space — presenter mode with remote participants, or a
-  // spotlight with others left over — in which case it moves to the top
-  // right so the two never overlap.
-  const hasBottomFilmstrip = presenter
-    ? remoteParticipants.length > 0
-    : Boolean(spotlightRemote) && galleryRemotes.length > 0
+  // occupies that space — a spotlight with others left over — in which case
+  // it moves to the top right so the two never overlap.
+  const hasBottomFilmstrip = Boolean(spotlightRemote) && galleryRemotes.length > 0
 
   // `media` is a fresh object every render (useLocalMedia doesn't memoize its
   // return value), so depending on it whole would defeat these useCallbacks'
@@ -277,18 +323,21 @@ export function Call({ roomId, isHost, media }: CallProps) {
 
       <div className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-5">
         {presenter ? (
-          <>
-            <PresentationStage
-              name={presenter.name}
-              isSelf={!!presenter.isSelf}
-              stream={presenter.isSelf ? media.screenStream : presenter.screenShareStream ?? null}
-            />
-            <RemoteFilmstrip
-              participants={remoteParticipants}
+          <div className="flex min-h-0 flex-1 gap-3.5">
+            <div className="flex min-w-0 flex-1 flex-col">
+              <PresentationStage
+                name={presenter.name}
+                isSelf={!!presenter.isSelf}
+                stream={presenter.isSelf ? media.screenStream : presenter.screenShareStream ?? null}
+              />
+            </div>
+            <PresenterSidebar
+              selfParticipant={selfParticipant}
+              remoteParticipants={remoteParticipants}
               isHost={isHost}
               activeSpeakerId={liveKit.activeRemoteSpeakerId}
             />
-          </>
+          </div>
         ) : alone ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <div className="aspect-video w-full max-w-3xl">
@@ -336,7 +385,7 @@ export function Call({ roomId, isHost, media }: CallProps) {
           </>
         )}
 
-        {!alone && (
+        {!alone && !presenter && (
           <div
             className={`absolute z-10 ${hasBottomFilmstrip ? 'top-4' : 'bottom-4'} right-4`}
             style={{

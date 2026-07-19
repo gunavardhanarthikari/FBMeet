@@ -11,7 +11,14 @@ export interface UseLocalMediaResult {
   micDenied: boolean
   isSupported: boolean
   message: string | null
-  requestMedia: () => void
+  /**
+   * Acquires whatever the user currently intends (camera defaults off, mic
+   * defaults on), and resolves with the resulting stream once every
+   * acquisition attempt has settled — so a caller can `await` this and then
+   * immediately use the returned stream (e.g. to publish/connect with),
+   * without racing React's own state-update/render cycle.
+   */
+  requestMedia: () => Promise<MediaStream | null>
   toggleCamera: () => void
   toggleMic: () => void
   retry: () => void
@@ -239,16 +246,23 @@ export function useLocalMedia(): UseLocalMediaResult {
     void acquireAudio()
   }, [status, acquireAudio])
 
-  const requestMedia = useCallback(() => {
-    if (status === 'requesting' || status === 'ready') return
+  const requestMedia = useCallback(async () => {
     if (!isMediaSupported()) {
       setStatus('unsupported')
-      return
+      return null
     }
-    // Only acquire what the user currently intends (camera defaults off, mic defaults on),
-    // so this is safe to call from any qualifying gesture without surprising the user.
-    if (!streamRef.current?.getVideoTracks().length && cameraOn) void acquireVideo()
-    if (!streamRef.current?.getAudioTracks().length && micOn) void acquireAudio()
+    if (status !== 'requesting' && status !== 'ready') {
+      // Only acquire what the user currently intends (camera defaults off, mic defaults on),
+      // so this is safe to call from any qualifying gesture without surprising the user.
+      const acquisitions: Promise<void>[] = []
+      if (!streamRef.current?.getVideoTracks().length && cameraOn) acquisitions.push(acquireVideo())
+      if (!streamRef.current?.getAudioTracks().length && micOn) acquisitions.push(acquireAudio())
+      await Promise.all(acquisitions)
+    }
+    // Read from the ref, not the `stream` state var — this may resolve
+    // inside the same tick as the acquisitions above, before React has
+    // re-rendered with the new state, and the ref is always current.
+    return streamRef.current
   }, [status, cameraOn, micOn, acquireVideo, acquireAudio])
 
   const retry = useCallback(() => {
