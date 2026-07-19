@@ -57,15 +57,21 @@ function ControlBarComponent({
         aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'}
         aria-pressed={!cameraOn}
       />
-      {shareSupported && (
-        <IconButton
-          icon={<ScreenShareIcon className="h-5.5 w-5.5" />}
-          variant={sharing ? 'active' : 'default'}
-          onClick={onToggleShare}
-          aria-label={sharing ? 'Stop presenting' : 'Present now'}
-          aria-pressed={sharing}
-        />
-      )}
+      <IconButton
+        icon={<ScreenShareIcon className="h-5.5 w-5.5" />}
+        variant={sharing ? 'active' : 'default'}
+        onClick={onToggleShare}
+        disabled={!shareSupported}
+        aria-label={
+          shareSupported
+            ? sharing
+              ? 'Stop presenting'
+              : 'Present now'
+            : 'Screen sharing is not supported in this browser'
+        }
+        title={shareSupported ? undefined : 'Screen sharing is not supported in this browser'}
+        aria-pressed={sharing}
+      />
       <IconButton
         icon={<HangUpIcon className="h-6 w-6" />}
         variant="leave"

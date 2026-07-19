@@ -9,6 +9,13 @@ interface ParticipantTileProps {
   isHostView?: boolean
   onToggleMute?: (id: string) => void
   onRemove?: (id: string) => void
+  /** 'grid' (default): equal-weight tile in the participant grid, fixed to a
+   *  16:9 aspect ratio. 'stage': fills its parent (used for the single
+   *  spotlighted remote when nobody else needs a grid). 'floating': the
+   *  small self-preview tile overlaid on top of the call. */
+  variant?: 'grid' | 'stage' | 'floating'
+  /** True while this participant is the loudest active remote speaker. */
+  isSpeaking?: boolean
 }
 
 function ParticipantTileComponent({
@@ -16,6 +23,8 @@ function ParticipantTileComponent({
   isHostView = false,
   onToggleMute,
   onRemove,
+  variant = 'grid',
+  isSpeaking = false,
 }: ParticipantTileProps) {
   const {
     name,
@@ -41,11 +50,19 @@ function ParticipantTileComponent({
     video.play().catch(() => {})
   }, [videoStream, hasVideo])
 
+  // 'stage' fills a parent that already has a definite height (a flex-1
+  // stage container), so it can be h-full/w-full directly. 'grid' and
+  // 'floating' sit inside containers that only constrain width (a grid
+  // column or the floating wrapper's width classes), so they need their own
+  // aspect-video to get a height at all.
+  const sizingClass = variant === 'stage' ? 'h-full w-full' : 'aspect-video w-full min-w-0'
+  const highlighted = isPresenting || isSpeaking
+
   return (
     <div
-      className={`relative aspect-video min-w-0 overflow-hidden rounded-md border bg-surface-sunken shadow-sm ${
-        isPresenting ? 'border-accent' : 'border-border-default'
-      }`}
+      className={`relative overflow-hidden rounded-md border bg-surface-sunken ${sizingClass} ${
+        variant === 'floating' ? 'shadow-lg' : 'shadow-sm'
+      } ${highlighted ? 'border-accent' : 'border-border-default'}`}
     >
       {hasVideo ? (
         <video
@@ -53,7 +70,11 @@ function ParticipantTileComponent({
           autoPlay
           playsInline
           muted={isSelf}
-          className={`h-full w-full object-cover ${isSelf ? 'scale-x-[-1]' : ''}`}
+          // object-contain (not cover): shows the camera's full, natural
+          // frame with no cropping — matching the device's own camera
+          // preview — regardless of whether the stream is portrait,
+          // landscape, or an unusual sensor ratio.
+          className={`h-full w-full object-contain ${isSelf ? 'scale-x-[-1]' : ''}`}
         />
       ) : (
         <GradientBackground seedColor={seedColor} className={cameraOff ? '' : 'opacity-90'}>

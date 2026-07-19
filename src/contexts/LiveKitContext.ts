@@ -16,8 +16,15 @@ export interface LiveKitContextValue {
   connectionState: LiveKitConnectionState
   remoteParticipants: Participant[]
   localConnectionQuality: ConnectionQualityLevel
+  /** Identity of the loudest currently-speaking remote participant, or null
+   *  when nobody remote is speaking (or nobody has spoken yet). */
+  activeRemoteSpeakerId: string | null
   justReconnected: boolean
   error: string | null
+  /** False when the browser has blocked autoplay of a remote participant's
+   *  audio — call `unlockAudio()` from a user gesture to resume playback. */
+  canPlaybackAudio: boolean
+  unlockAudio: () => void
   connect: (roomId: string, participantName: string, localStream: MediaStream | null) => Promise<boolean>
   disconnect: () => void
 }

@@ -43,7 +43,9 @@ export function PreviewCard({
           autoPlay
           muted
           playsInline
-          className="h-full w-full scale-x-[-1] object-cover"
+          // object-contain: shows the camera's full natural frame, matching
+          // the device's own camera preview, with no cropping/zoom.
+          className="h-full w-full scale-x-[-1] object-contain"
         />
       ) : (
         <GradientBackground seedColor="#0d3a37" className="flex-col gap-3.5">

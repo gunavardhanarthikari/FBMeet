@@ -25,7 +25,7 @@ export function IconButton({
     <button
       type="button"
       style={{ width: size, height: size }}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border transition-all duration-300 ease-out-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${variantStyles[variant]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border transition-all duration-300 ease-out-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${variantStyles[variant]} ${className}`}
       {...props}
     >
       {icon}

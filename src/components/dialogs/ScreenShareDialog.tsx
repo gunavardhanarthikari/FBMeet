@@ -42,7 +42,8 @@ export function ScreenShareDialog({ onConfirm, onCancel, fast = false }: ScreenS
           Share your screen?
         </h2>
         <p className="mt-2.5 font-body text-lg text-text-soft italic">
-          Everyone in the room will see what you choose to present.
+          Everyone in the room will see what you choose to present. Pick a screen, window, or tab
+          next, and stop anytime from the controls below.
         </p>
         <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
           <SecondaryButton onClick={onCancel}>No</SecondaryButton>

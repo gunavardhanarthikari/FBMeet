@@ -77,6 +77,16 @@ export function HangUpIcon(props: IconProps) {
   )
 }
 
+export function SpeakerMutedIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3.5 9.5v5h4l5.5 4.5v-14L7.5 9.5h-4z" />
+      <path d="M16 9l5 6" />
+      <path d="M21 9l-5 6" />
+    </svg>
+  )
+}
+
 export function XIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

@@ -123,3 +123,17 @@ h6 {
   font-weight: 500;
   color: var(--color-text-title);
 }
+
+/* Locks the in-call screen to the real visible viewport so it never scrolls
+   like a document — a native call app doesn't scroll its own frame. `dvh`
+   tracks mobile browsers' collapsing/expanding toolbar; the plain `vh` line
+   above it is the fallback for browsers without `dvh` support (older iOS
+   Safari) and is intentionally overridden where supported. */
+.h-call-viewport {
+  height: 100vh;
+  height: 100dvh;
+  /* Belt-and-braces against iOS Safari's rubber-band bounce: the layout
+     itself never overflows, but a stray touchmove could still scroll the
+     page underneath without this. */
+  overscroll-behavior: none;
+}

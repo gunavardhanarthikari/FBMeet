@@ -85,6 +85,8 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
   const [justReconnected, setJustReconnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [room, setRoom] = useState<Room | null>(null)
+  const [canPlaybackAudio, setCanPlaybackAudio] = useState(true)
+  const [activeRemoteSpeakerId, setActiveRemoteSpeakerId] = useState<string | null>(null)
 
   const roomRef = useRef<Room | null>(null)
   const audioElementsRef = useRef<Map<string, HTMLMediaElement>>(new Map())
@@ -127,6 +129,8 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
     setRoom(null)
     setRemoteParticipants([])
     setConnectionState('disconnected')
+    setCanPlaybackAudio(true)
+    setActiveRemoteSpeakerId(null)
   }, [teardownRoom])
 
   const connect = useCallback(
@@ -218,6 +222,21 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
           setConnectionState('disconnected')
           setRemoteParticipants([])
         })
+        // Browsers can block autoplay of the remote audio elements we attach
+        // in TrackSubscribed above; LiveKit surfaces that here so the UI can
+        // prompt for a user gesture to unlock it via startAudio().
+        nextRoom.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+          if (isStale()) return
+          setCanPlaybackAudio(nextRoom.canPlaybackAudio)
+        })
+
+        // Speakers are sorted loudest-first; the local participant is
+        // excluded because the layout only ever spotlights remote speakers.
+        nextRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          if (isStale()) return
+          const loudestRemote = speakers.find((speaker) => !speaker.isLocal)
+          setActiveRemoteSpeakerId(loudestRemote?.identity ?? null)
+        })
 
         await nextRoom.connect(livekitUrl, token)
 
@@ -229,6 +248,7 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
 
         roomRef.current = nextRoom
         setRoom(nextRoom)
+        setCanPlaybackAudio(nextRoom.canPlaybackAudio)
 
         if (localStream) {
           const tracks = [...localStream.getVideoTracks(), ...localStream.getAudioTracks()]
@@ -262,6 +282,16 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
     },
     [syncParticipants, teardownRoom],
   )
+
+  // Must be invoked from a direct user gesture (click/tap) — that's what
+  // lets the browser's autoplay policy allow audio playback to resume.
+  const unlockAudio = useCallback(() => {
+    const current = roomRef.current
+    if (!current) return
+    void current.startAudio().then(() => {
+      setCanPlaybackAudio(current.canPlaybackAudio)
+    })
+  }, [])
 
   // Browser-level connectivity loss (e.g. wifi drops, tab backgrounded on a
   // spotty connection): react immediately rather than waiting for LiveKit's
@@ -301,8 +331,11 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
       connectionState,
       remoteParticipants,
       localConnectionQuality,
+      activeRemoteSpeakerId,
       justReconnected,
       error,
+      canPlaybackAudio,
+      unlockAudio,
       connect,
       disconnect,
     }),
@@ -311,8 +344,11 @@ export function LiveKitProvider({ children }: { children: ReactNode }) {
       connectionState,
       remoteParticipants,
       localConnectionQuality,
+      activeRemoteSpeakerId,
       justReconnected,
       error,
+      canPlaybackAudio,
+      unlockAudio,
       connect,
       disconnect,
     ],

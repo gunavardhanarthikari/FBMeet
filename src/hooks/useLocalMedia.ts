@@ -89,7 +89,25 @@ export function useLocalMedia(): UseLocalMediaResult {
     const token = ++videoTokenRef.current
     setStatus('requesting')
     try {
-      const acquired = await navigator.mediaDevices.getUserMedia({ video: true })
+      // `ideal` (never `exact`) constraints only, and only for what rendering
+      // can't fix on its own: a resolution ceiling for quality, and front
+      // camera as the default on devices with more than one. We deliberately
+      // do NOT request an ideal aspectRatio — doing so can push some cameras
+      // into a digitally-cropped mode to hit that ratio, which is the exact
+      // "artificial zoom" tiles must avoid. Tiles instead render whatever
+      // aspect ratio the camera naturally provides (see ParticipantTile's
+      // object-contain). `ideal` degrades gracefully on devices that can't
+      // match it, so compatibility is unaffected. 720p is also the same
+      // ceiling LiveKit's adaptiveStream/dynacast already budget bandwidth
+      // for, so this doesn't add avoidable bandwidth beyond what a normal
+      // call already uses.
+      const acquired = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: { ideal: 'user' },
+        },
+      })
       if (token !== videoTokenRef.current || !mountedRef.current) {
         acquired.getTracks().forEach((t) => t.stop())
         return
